@@ -4,3 +4,4 @@ numpy
 h5py
 Pillow
 opencv-python
+opencv-python-headless
