@@ -1,44 +1,42 @@
 import streamlit as st
 import tensorflow as tf
-from tensorflow.keras.models import load_model
-from tensorflow.keras.preprocessing import image
 import numpy as np
-import os
+import cv2
+import gdown  # For downloading large models
+from PIL import Image
 
-# Load the trained model
-MODEL_PATH = 'body_shape_model.h5'
-model = load_model(MODEL_PATH)
+# Download Model from Google Drive
+MODEL_PATH = "body_shape_model.h5"
 
-# Define class labels
-CLASS_LABELS = ['Apple-shaped', 'Hourglass', 'Inverted Triangle', 'Pear-shaped', 'Rectangle']
+@st.cache_resource
+def load_model():
+    try:
+        gdown.download('https://drive.google.com/uc?id=1-0lkvwosd0l9j8_mcQKp4so1Irtg8YJl', MODEL_PATH, quiet=False)
+        return tf.keras.models.load_model(MODEL_PATH)
+    except Exception as e:
+        st.error(f"Error loading model: {e}")
+        return None
 
-# Function to preprocess image
-def preprocess_image(img_path):
-    img = image.load_img(img_path, target_size=(224, 224))
-    img_array = image.img_to_array(img) / 255.0
-    img_array = np.expand_dims(img_array, axis=0)
-    return img_array
+model = load_model()
 
-# Streamlit app layout
-st.title("Body Shape Classification App")
+# Prediction Function
+def predict(image):
+    img = np.array(image.resize((224, 224))) / 255.0
+    img = np.expand_dims(img, axis=0)
+    prediction = model.predict(img)
+    class_labels = ['Apple', 'Hourglass', 'Inverted Triangle', 'Pear', 'Rectangle']
+    return class_labels[np.argmax(prediction)]
 
-uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
+# Streamlit UI
+st.title("👗 Body Shape Classifier")
+st.write("Upload an image to predict the body shape.")
+
+uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "png", "jpeg"])
 
 if uploaded_file is not None:
-    # Save uploaded file temporarily
-    file_path = "temp_image.jpg"
-    with open(file_path, "wb") as f:
-        f.write(uploaded_file.getvalue())
-
-    # Display uploaded image
-    st.image(file_path, caption="Uploaded Image", use_column_width=True)
-
-    # Predict
-    img_array = preprocess_image(file_path)
-    prediction = model.predict(img_array)
-    predicted_class = CLASS_LABELS[np.argmax(prediction)]
-    confidence = np.max(prediction) * 100
-
-    # Display result
-    st.success(f"Prediction: **{predicted_class}**")
-    st.info(f"Confidence: {confidence:.2f}%")
+    image = Image.open(uploaded_file)
+    st.image(image, caption='Uploaded Image', use_column_width=True)
+    
+    if st.button('Predict'):
+        result = predict(image)
+        st.success(f"Predicted Body Shape: **{result}**")
